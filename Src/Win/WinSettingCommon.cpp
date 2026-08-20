@@ -7,6 +7,7 @@
 WinSettingCommon::WinSettingCommon(Ling::WinBase* parent):Ling::Node(parent)
 {    
     initAutoStartCtrls();
+    initToolbarScaleCtrls();
     initLangCtrls();
     auto weakThis = getWeakThis();
     // 这个回调一直挂在窗口上，而本节点可能在窗口关闭之前就被菜单切换换掉了，
@@ -15,6 +16,35 @@ WinSettingCommon::WinSettingCommon(Ling::WinBase* parent):Ling::Node(parent)
         if (!weakThis.lock()) return;
         this->hideSelectBox();
     });
+}
+
+void WinSettingCommon::initToolbarScaleCtrls()
+{
+    auto box = makeChild<Ling::Node>();
+    box->setHeight(39.f);
+    box->setFlexDirection(Ling::FlexDirection::Row);
+    box->setAlignItems(Ling::Align::Center);
+
+    auto label = box->makeChild<Ling::Label>();
+    label->setText(Lang::get(L"setting.captureToolbarScale"));
+    label->setHeightPercent(100.f);
+    label->setJustifyContent(Ling::Justify::Center);
+    label->setFlexGrow(1.f);
+
+    scaleBtn = box->makeChild<Ling::Button>();
+    scaleBtn->setText(std::format(L"{:.1f}×", Setting::get()->getCaptureToolbarScale()));
+    scaleBtn->setHeight(28.f);
+    scaleBtn->setWidth(160.f);
+    scaleBtn->setBorder(1.f, 0xE0E0E0FF);
+    scaleBtn->setHoverBg(0XFFFFFFFF);
+    scaleBtn->onClick.add([this](Ling::Button* btn) {
+        if (selectBox) return;
+        showToolbarScaleBox(btn);
+    });
+
+    auto border = makeChild<Ling::Node>();
+    border->setHeight(1.f);
+    border->setBg(0xE0E0E0FF);
 }
 
 WinSettingCommon::~WinSettingCommon()
@@ -123,7 +153,8 @@ void WinSettingCommon::showSelectBox(Ling::Button* btn)
     onMouseDownToken = win->onMouseDown.add([this,weakThis](POINT pos, bool isRight) {
         if (!weakThis.lock()) return;
         if (!this->selectBox) return;
-        if (this->selectBtn->isPosIn(pos)) return;
+        if (this->selectBtn && this->selectBtn->isPosIn(pos)) return;
+        if (this->scaleBtn && this->scaleBtn->isPosIn(pos)) return;
         if (this->selectBox->isPosIn(pos)) return;
         win->body->removeChild(selectBox);
         this->selectBox = nullptr;
@@ -181,4 +212,40 @@ void WinSettingCommon::showSelectBox(Ling::Button* btn)
         win->body->removeChild(selectBox);
         selectBox = nullptr;
     });
+}
+
+void WinSettingCommon::showToolbarScaleBox(Ling::Button* btn)
+{
+    auto weakThis = getWeakThis();
+    onMouseDownToken = win->onMouseDown.add([this, weakThis](POINT pos, bool isRight) {
+        if (!weakThis.lock() || !selectBox) return;
+        if (scaleBtn && scaleBtn->isPosIn(pos)) return;
+        if (selectBox->isPosIn(pos)) return;
+        hideSelectBox();
+    });
+
+    constexpr float itemH{ 30.f };
+    constexpr int optionCount{ 11 };
+    selectBox = win->body->makeChild<Ling::ScrollerBox>();
+    selectBox->setSize(btn->w / win->dpi, itemH * optionCount);
+    selectBox->setPositionType(Ling::Position::Absolute);
+    selectBox->setPosition(Ling::Edge::Left, btn->x / win->dpi);
+    selectBox->setPosition(Ling::Edge::Top, btn->y / win->dpi);
+    selectBox->setBg(0xFFFFFFFF);
+    selectBox->setBorder(1.f, 0x597ef766);
+
+    for (int i = 0; i < optionCount; ++i) {
+        const auto scale = 1.f + static_cast<float>(i) / 10.f;
+        auto item = selectBox->makeChild<Ling::Button>();
+        item->setText(i == 0 ? Lang::get(L"setting.captureToolbarScaleDefault") : std::format(L"{:.1f}×", scale));
+        item->setHeight(itemH);
+        item->setWidthPercent(100.f);
+        item->setHoverBg(0Xf2f2f2FF);
+        item->setHoverColor(0X000000FF);
+        item->onClick.add([this, scale](Ling::Button*) {
+            Setting::get()->setCaptureToolbarScale(scale);
+            scaleBtn->setText(std::format(L"{:.1f}×", scale));
+            hideSelectBox();
+        });
+    }
 }

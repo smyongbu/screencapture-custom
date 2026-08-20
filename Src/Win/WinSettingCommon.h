@@ -11,10 +11,13 @@ public:
 private:
 	void initAutoStartCtrls();
 	void initLangCtrls();
+	void initToolbarScaleCtrls();
 	void setAutoStartBtn(Ling::Button* btn);
 	void showSelectBox(Ling::Button* btn);
+	void showToolbarScaleBox(Ling::Button* btn);
 private:
 	Ling::Button* selectBtn{ nullptr };
+	Ling::Button* scaleBtn{ nullptr };
 	Ling::ScrollerBox* selectBox{ nullptr };
 	winrt::event_token onMouseDownToken;
 };

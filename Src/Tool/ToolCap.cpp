@@ -1,11 +1,13 @@
 ﻿#include "pch.h"
 #include "../Win/WinCap.h"
 #include "../Lang.h"
+#include "../Setting.h"
 #include "../Tip.h"
 #include "ToolCap.h"
 
 ToolCap::ToolCap(WinCap* win) : Ling::WinBase(), win(win)
 {
+	toolbarScale = Setting::get()->getCaptureToolbarScale();
 	// 跟着宿主窗口的缩放走：WinBase 构造里取的是系统 dpi，宿主可能在另一块缩放比例不同的屏上
 	dpi = win->dpi;
 	// 位置由 WinCap::layoutTool() 在 createNativeWindow 之前设好，这里只算尺寸
@@ -27,6 +29,7 @@ ToolCap::ToolCap(WinCap* win) : Ling::WinBase(), win(win)
 
 void ToolCap::refreshSize()
 {
+	const auto btnSize = baseBtnSize * toolbarScale;
 	float logicW{ 0.f };
 	for (auto& id : btnIds) {
 		logicW += (id == L"spliter") ? spliterW : btnSize;
@@ -49,18 +52,18 @@ void ToolCap::onCreated()
 	{
 		if (btnIds[i] == L"spliter") {
 			auto spliter = body->makeChild<Ling::Node>();
-			spliter->setSize(spliterW, 18.f);
+			spliter->setSize(spliterW, baseSpliterH * toolbarScale);
 			spliter->setBg(0xDDDDDDff);
 			continue;
 		}
 		auto btn = body->makeChild<Ling::Button>();
 		btn->setId(btnIds[i]);
 		btn->setText(btnCodes[i]);
-		btn->setWidth(btnSize);
+		btn->setWidth(baseBtnSize * toolbarScale);
 		btn->setHeightPercent(100.f);
 		btn->setHoverBg(0xF2F2F2ff);
 		btn->setFontFamily(L"icon");
-		btn->setFontSize(13.f);
+		btn->setFontSize(baseFontSize * toolbarScale);
 		btn->onClick.add([this](Ling::Button* btn) { onClick(btn); });
 		if (!btnTips[i].empty()) {
 			tip->bind(btn, Lang::get(btnTips[i]));

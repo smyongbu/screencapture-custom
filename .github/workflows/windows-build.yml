@@ -1,0 +1,61 @@
+name: Windows 云端构建
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - feature/toolbar-scale
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: 检出源码
+        uses: actions/checkout@v4
+
+      - name: 准备 Visual Studio 编译环境
+        uses: microsoft/setup-msbuild@v2
+
+      - name: 固定并下载依赖
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force deps | Out-Null
+          git clone --filter=blob:none https://github.com/xland/Ling.git deps/Ling
+          git -C deps/Ling checkout 26f27d361174f835df43d936c91fe75e1b3c0ad0
+          git clone --filter=blob:none --branch 1.34.0 https://github.com/ImageOptim/gifski.git deps/gifski
+
+      - name: 编译 gifski
+        working-directory: deps/gifski
+        run: cargo build --release --lib --locked
+
+      - name: 编译 Ling 和 Yoga
+        shell: pwsh
+        run: |
+          msbuild deps/Ling/yoga/yoga.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+          msbuild deps/Ling/Ling.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+
+      - name: 编译截图工具
+        shell: pwsh
+        run: msbuild Src/ScreenCapture.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+
+      - name: 整理成品
+        shell: pwsh
+        run: |
+          $exe = Get-ChildItem -Recurse -Filter ScreenCapture.exe | Where-Object { $_.FullName -notlike '*\\deps\\*' } | Select-Object -First 1
+          if (-not $exe) { throw '没有找到 ScreenCapture.exe' }
+          New-Item -ItemType Directory -Force artifact | Out-Null
+          Copy-Item -LiteralPath $exe.FullName -Destination artifact/截屏工具.exe
+          Get-FileHash artifact/截屏工具.exe -Algorithm SHA256 | Format-List
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: 截屏工具-Windows-x64
+          path: artifact/截屏工具.exe
+          if-no-files-found: error
+          retention-days: 14

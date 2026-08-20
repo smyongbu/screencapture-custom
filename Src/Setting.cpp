@@ -5,13 +5,54 @@
 #include "Lang.h"
 #include "Win/WinCap.h"
 #include "App.h"
+#include <cmath>
+#include <fstream>
 
 namespace {
     std::unique_ptr<Setting> setting;
     constexpr int capShortcutMsgId{ 100 };
     // 配置文件的默认内容。空文件、坏 JSON、缺键都拿它兜底，所以这里列出的每一项
     // 都是代码里会直接按名字取的（见 getLang / getAutoStart / initShortcutKeys）
-    constexpr std::wstring_view defaultConfig{ LR"""({"common":{"autoStart":false,"language":"zh-CN"},"shortcutKey":{"cap":"Ctrl+Alt+A"}})""" };
+    constexpr std::wstring_view defaultConfig{ LR"""({"common":{"autoStart":false,"language":"zh-CN","captureToolbarScale":1.0},"shortcutKey":{"cap":"Ctrl+Alt+A"}})""" };
+
+    float normalizeToolbarScale(float scale)
+    {
+        if (!std::isfinite(scale)) return 1.f;
+        scale = std::clamp(scale, 1.f, 2.f);
+        return std::round(scale * 10.f) / 10.f;
+    }
+
+    void writeSettingLog(const std::filesystem::path& dataPath, bool error, const std::wstring& message)
+    {
+        try {
+            auto logDir = dataPath / L"logs";
+            std::filesystem::create_directories(logDir);
+            auto path = logDir / (error ? L"错误.log" : L"运行.log");
+            auto backup = logDir / (error ? L"错误.old.log" : L"运行.old.log");
+            if (std::filesystem::exists(path) && std::filesystem::file_size(path) >= 256 * 1024) {
+                std::error_code ec;
+                std::filesystem::remove(backup, ec);
+                ec.clear();
+                std::filesystem::rename(path, backup, ec);
+            }
+
+            SYSTEMTIME now{};
+            GetLocalTime(&now);
+            auto operationId = std::format(L"{}-{}", GetCurrentProcessId(), GetTickCount64());
+            auto line = std::format(L"{:04}-{:02}-{:02} {:02}:{:02}:{:02} [{}] [设置] [{}] {}\r\n",
+                now.wYear, now.wMonth, now.wDay, now.wHour, now.wMinute, now.wSecond,
+                error ? L"ERROR" : L"INFO", operationId, message);
+            auto bytesNeeded = WideCharToMultiByte(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), nullptr, 0, nullptr, nullptr);
+            if (bytesNeeded <= 0) return;
+            std::string utf8(static_cast<size_t>(bytesNeeded), '\0');
+            WideCharToMultiByte(CP_UTF8, 0, line.data(), static_cast<int>(line.size()), utf8.data(), bytesNeeded, nullptr, nullptr);
+            std::ofstream stream(path, std::ios::binary | std::ios::app);
+            stream.write(utf8.data(), static_cast<std::streamsize>(utf8.size()));
+        }
+        catch (...) {
+            // 日志失败不应影响用户保存设置。
+        }
+    }
 }
 
 
@@ -183,6 +224,35 @@ void Setting::setLang(const std::wstring& langCode)
     common.SetNamedValue(L"language", JsonValue::CreateStringValue(langCode));
     setting->save();
 	Lang::get()->initLang(langCode);
+}
+
+float Setting::getCaptureToolbarScale()
+{
+    auto common = configObj.GetNamedObject(L"common", nullptr);
+    if (!common) return 1.f;
+    auto scale = static_cast<float>(common.GetNamedNumber(L"captureToolbarScale", 1.0));
+    auto normalized = normalizeToolbarScale(scale);
+    if (!std::isfinite(scale) || scale < 1.f || scale > 2.f) {
+        writeSettingLog(dataPath, true, std::format(L"截图工具栏缩放值无效，已回退到 {:.1f}×。", normalized));
+    }
+    return normalized;
+}
+
+void Setting::setCaptureToolbarScale(float scale)
+{
+    auto requested = scale;
+    scale = normalizeToolbarScale(scale);
+    auto common = configObj.GetNamedObject(L"common", nullptr);
+    if (!common) {
+        common = JsonObject();
+        configObj.SetNamedValue(L"common", common);
+    }
+    common.SetNamedValue(L"captureToolbarScale", JsonValue::CreateNumberValue(scale));
+    save();
+    if (!std::isfinite(requested) || requested < 1.f || requested > 2.f) {
+        writeSettingLog(dataPath, true, std::format(L"尝试设置超出范围的工具栏缩放值，已修正为 {:.1f}×。", scale));
+    }
+    writeSettingLog(dataPath, false, std::format(L"截图工具栏缩放已设置为 {:.1f}×。", scale));
 }
 
 JsonObject Setting::getToolObj(const std::wstring& tool)

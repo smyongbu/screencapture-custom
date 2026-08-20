@@ -29,6 +29,9 @@ private:
 	// 翻译 key。空串是分隔符，没提示可挂
 	std::vector<std::wstring> btnTips = { L"cap.mark",L"cap.long",L"cap.video",L"cap.ocr",L"cap.qrcode",L"",L"tool.close",L"tool.save",L"tool.clipboard" };
 	// 以下都是逻辑像素，交给 Ling 的 setter 时由其内部乘 dpi
-	static constexpr float btnSize{ 32.f };
+	float toolbarScale{ 1.f };
+	static constexpr float baseBtnSize{ 32.f };
+	static constexpr float baseFontSize{ 13.f };
+	static constexpr float baseSpliterH{ 18.f };
 	static constexpr float spliterW{ 1.f };
 };
