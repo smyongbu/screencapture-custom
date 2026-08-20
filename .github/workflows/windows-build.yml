@@ -30,6 +30,20 @@ jobs:
           git -C deps/Ling checkout 26f27d361174f835df43d936c91fe75e1b3c0ad0
           git clone --filter=blob:none --branch 1.34.0 https://github.com/ImageOptim/gifski.git deps/gifski
 
+          # Ling 当前工程依赖作者的解决方案目录语义，并使用了 VS 2026 才能接受的宏写法。
+          # GitHub 的 VS 2022 构建机上做两个最小、可审计的临时兼容修复。
+          $yogaProject = 'deps/Ling/yoga/yoga.vcxproj'
+          $yogaXml = Get-Content -Raw -LiteralPath $yogaProject
+          $yogaXml = $yogaXml.Replace('$(SolutionDir)', '$(ProjectDir)..\')
+          Set-Content -LiteralPath $yogaProject -Value $yogaXml -Encoding utf8
+
+          $utilHeader = 'deps/Ling/include/Util.h'
+          $utilText = Get-Content -Raw -LiteralPath $utilHeader
+          $oldLine = 'return chars[(s >> (idx * 3)) % chars.size()];'
+          $newLine = 'return std::wstring_view(L"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")[(s >> (idx * 3)) % 62];'
+          if (-not $utilText.Contains($oldLine)) { throw 'Ling 兼容补丁目标不存在' }
+          Set-Content -LiteralPath $utilHeader -Value $utilText.Replace($oldLine, $newLine) -Encoding utf8
+
       - name: 编译 gifski
         working-directory: deps/gifski
         run: cargo build --release --lib --locked
@@ -37,7 +51,7 @@ jobs:
       - name: 编译 Ling 和 Yoga
         shell: pwsh
         run: |
-          msbuild deps/Ling/yoga/yoga.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+          msbuild deps/Ling/yoga/yoga.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:OutDir="$env:GITHUB_WORKSPACE\deps\Ling\x64\Release\"
           msbuild deps/Ling/Ling.vcxproj /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
 
       - name: 编译截图工具
