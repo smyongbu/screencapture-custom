@@ -17,7 +17,6 @@ Set-Content -LiteralPath $utilHeaderPath -Value $utilHeader -Encoding utf8
 
 $utilSourcePath = 'deps/Ling/src/Util.cpp'
 $utilSource = Get-Content -Raw -LiteralPath $utilSourcePath
-$utilEnd = "`n}`n"
 $utilDefinitions = @'
 
     std::string Util::convertToStr(const std::wstring& str)
@@ -72,7 +71,7 @@ $utilDefinitions = @'
         return { HIWORD(info->dwFileVersionMS), LOWORD(info->dwFileVersionMS), HIWORD(info->dwFileVersionLS) };
     }
 '@
-$last = $utilSource.LastIndexOf($utilEnd)
+$last = $utilSource.LastIndexOf('}')
 if ($last -lt 0) { throw '找不到 Ling Util.cpp 插入点' }
 $utilSource = $utilSource.Insert($last, $utilDefinitions)
 Set-Content -LiteralPath $utilSourcePath -Value $utilSource -Encoding utf8
