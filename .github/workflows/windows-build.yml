@@ -43,6 +43,7 @@ jobs:
           $newLine = 'return std::wstring_view(L"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")[(s >> (idx * 3)) % 62];'
           if (-not $utilText.Contains($oldLine)) { throw 'Ling 兼容补丁目标不存在' }
           Set-Content -LiteralPath $utilHeader -Value $utilText.Replace($oldLine, $newLine) -Encoding utf8
+          ./Build/patch-ling.ps1
 
       - name: 编译 gifski
         working-directory: deps/gifski
