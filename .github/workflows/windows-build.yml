@@ -6,9 +6,11 @@ on:
     branches:
       - main
       - feature/toolbar-scale
+    paths-ignore:
+      - artifact/**
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -68,10 +70,11 @@ jobs:
           Copy-Item -LiteralPath $exe.FullName -Destination artifact/截屏工具.exe
           Get-FileHash artifact/截屏工具.exe -Algorithm SHA256 | Format-List
 
-      - name: 上传构建产物
-        uses: actions/upload-artifact@v4
-        with:
-          name: 截屏工具-Windows-x64
-          path: artifact/截屏工具.exe
-          if-no-files-found: error
-          retention-days: 14
+      - name: 保存到私有仓库
+        shell: pwsh
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -f artifact/截屏工具.exe
+          git commit -m "build: 更新 Windows x64 成品"
+          git push origin HEAD:main
