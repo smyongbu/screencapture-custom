@@ -1,4 +1,4 @@
-﻿#include "pch.h"
+#include "pch.h"
 #include <include/Ling.h>
 #include "Setting.h"
 #include "Util.h"
@@ -13,13 +13,20 @@ namespace {
     constexpr int capShortcutMsgId{ 100 };
     // 配置文件的默认内容。空文件、坏 JSON、缺键都拿它兜底，所以这里列出的每一项
     // 都是代码里会直接按名字取的（见 getLang / getAutoStart / initShortcutKeys）
-    constexpr std::wstring_view defaultConfig{ LR"""({"common":{"autoStart":false,"language":"zh-CN","captureToolbarScale":1.0},"shortcutKey":{"cap":"Ctrl+Alt+A"}})""" };
+    constexpr std::wstring_view defaultConfig{ LR"""({"common":{"autoStart":false,"language":"zh-CN","captureToolbarScale":1.0,"tooltipDelay":1.0},"shortcutKey":{"cap":"Ctrl+Alt+A"}})""" };
 
     float normalizeToolbarScale(float scale)
     {
         if (!std::isfinite(scale)) return 1.f;
         scale = std::clamp(scale, 1.f, 2.f);
         return std::round(scale * 10.f) / 10.f;
+    }
+
+    float normalizeTooltipDelay(float delay)
+    {
+        if (!std::isfinite(delay)) return 1.f;
+        delay = std::clamp(delay, 0.f, 1.f);
+        return std::round(delay * 10.f) / 10.f;
     }
 
     void writeSettingLog(const std::filesystem::path& dataPath, bool error, const std::wstring& message)
@@ -236,6 +243,35 @@ float Setting::getCaptureToolbarScale()
         writeSettingLog(dataPath, true, std::format(L"截图工具栏缩放值无效，已回退到 {:.1f}×。", normalized));
     }
     return normalized;
+}
+
+float Setting::getTooltipDelay()
+{
+    auto common = configObj.GetNamedObject(L"common", nullptr);
+    if (!common) return 1.f;
+    auto delay = static_cast<float>(common.GetNamedNumber(L"tooltipDelay", 1.0));
+    auto normalized = normalizeTooltipDelay(delay);
+    if (!std::isfinite(delay) || delay < 0.f || delay > 1.f) {
+        writeSettingLog(dataPath, true, std::format(L"悬浮提示延迟值无效，已回退到 {:.1f} 秒。", normalized));
+    }
+    return normalized;
+}
+
+void Setting::setTooltipDelay(float delay)
+{
+    auto requested = delay;
+    delay = normalizeTooltipDelay(delay);
+    auto common = configObj.GetNamedObject(L"common", nullptr);
+    if (!common) {
+        common = JsonObject();
+        configObj.SetNamedValue(L"common", common);
+    }
+    common.SetNamedValue(L"tooltipDelay", JsonValue::CreateNumberValue(delay));
+    save();
+    if (!std::isfinite(requested) || requested < 0.f || requested > 1.f) {
+        writeSettingLog(dataPath, true, std::format(L"尝试设置超出范围的悬浮提示延迟，已修正为 {:.1f} 秒。", delay));
+    }
+    writeSettingLog(dataPath, false, std::format(L"悬浮提示延迟已设置为 {:.1f} 秒。", delay));
 }
 
 void Setting::setCaptureToolbarScale(float scale)

@@ -7,7 +7,7 @@
 // 一个窗口配一个实例，宿主窗口负责持有它（tooltip 是宿主 hwnd 的子窗口）。
 // 因为要 hwnd，所以只能在 onCreated() 里建，不能在构造函数里建。
 //
-// 显示要等 1 秒（鼠标只是路过时不该弹东西），隐藏立刻。
+// 显示要按配置等待（鼠标只是路过时不该弹东西），隐藏立刻。
 class Tip
 {
 public:
@@ -33,7 +33,7 @@ public:
 	// 自己算锚点的调用方（比如跟着鼠标走的滑块提示）也用它，免得两处数值不一样。
 	static constexpr float anchorInset{ 4.f };
 private:
-	// 真正把提示摆出来/更新掉，1 秒计时到点后才会走到这里
+	// 真正把提示摆出来/更新掉，显示时机到点后才会走到这里
 	void showNow();
 	// 提示按当前文字要占多大（不需要提示已经显示出来）
 	SIZE measure();
@@ -48,10 +48,9 @@ private:
 	Ling::Node* owner{ nullptr };
 	std::wstring text;
 	float anchorX{ 0.f }, anchorY{ 0.f };
-	// visible: 提示已经在屏上；否则要么没提示，要么正在等那 1 秒
+	// visible: 提示已经在屏上；否则要么没提示，要么正在等待显示时机
 	bool visible{ false };
 	winrt::event_token timerTok{};
 	// 定时器 id 要避开宿主窗口里其他人在用的（ToolVideo 用 100，Ling 的 TextBox 从 0x4200 起）
 	static constexpr UINT timerId{ 0x5100 };
-	static constexpr UINT delayMs{ 1000 };
 };

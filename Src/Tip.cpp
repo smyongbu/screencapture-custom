@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <CommCtrl.h>
 #include "Tip.h"
+#include "Setting.h"
 #include "App.h"
 
 namespace {
@@ -71,20 +72,25 @@ void Tip::showAt(Ling::Node* owner, float screenX, float screenY, const std::wst
 {
 	if (this->owner == owner) {
 		// 同一个归属：只更新内容与位置。已经显示出来的就立刻跟上（滑块提示跟着鼠标走靠这条），
-		// 还在等那 1 秒的则保持计时不重置，到点后按最新位置显示。
+		// 还在等延时窗口的则保持计时不重置，到点后按最新位置显示。
 		this->text = text;
 		anchorX = screenX;
 		anchorY = screenY;
 		if (visible) showNow();
 		return;
 	}
-	// 换归属：旧提示立刻收掉，1 秒重新计时
+	// 换归属：旧提示立刻收掉，按新设置重新计时
 	hide();
 	this->owner = owner;
 	this->text = text;
 	anchorX = screenX;
 	anchorY = screenY;
-	win->setTimer(delayMs, timerId);
+	auto delayMs = static_cast<UINT>(std::lround(Setting::get()->getTooltipDelay() * 1000.0f));
+	if (delayMs == 0) {
+		showNow();
+	} else {
+		win->setTimer(delayMs, timerId);
+	}
 }
 
 void Tip::hide(Ling::Node* owner)
